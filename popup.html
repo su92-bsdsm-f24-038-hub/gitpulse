@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GitPulse</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* ====== GitPulse — Obsidian & Neon-Purple ====== */
+    :root {
+      --gp-bg: #030712;
+      --gp-bg-2: #06091a;
+      --gp-card: rgba(15, 17, 32, 0.55);
+      --gp-border: rgba(168, 85, 247, 0.25);
+      --gp-border-strong: rgba(168, 85, 247, 0.55);
+      --gp-violet: #a855f7;
+      --gp-pink: #ec4899;
+      --gp-text: #e8eaf6;
+      --gp-text-dim: #9aa3c7;
+      --gp-text-mute: #6b7390;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--gp-bg);
+      color: var(--gp-text);
+      font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      width: 380px;
+      min-height: 520px;
+      overflow: hidden;
+    }
+
+    body {
+      background:
+        radial-gradient(1200px 600px at 110% -10%, rgba(168,85,247,0.18), transparent 60%),
+        radial-gradient(900px 500px at -10% 110%, rgba(236,72,153,0.10), transparent 60%),
+        linear-gradient(180deg, #030712 0%, #04061a 100%);
+    }
+
+    .app {
+      padding: 18px 18px 22px;
+      display: flex; flex-direction: column;
+      gap: 14px;
+    }
+
+    /* --- Header --- */
+    .gp-header {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .gp-brand {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .gp-logo {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+      box-shadow: 0 0 18px rgba(168,85,247,0.55), inset 0 0 6px rgba(255,255,255,0.15);
+      display: grid; place-items: center; color: #fff; font-weight: 900; font-size: 14px;
+    }
+    .gp-title {
+      font-weight: 900; font-size: 20px; letter-spacing: -0.02em;
+      background: linear-gradient(90deg, #a855f7 0%, #ec4899 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .gp-sub {
+      font-size: 10px; color: var(--gp-text-mute); letter-spacing: 0.18em; text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    /* --- Glass card --- */
+    .card {
+      background: var(--gp-card);
+      border: 1px solid var(--gp-border);
+      border-radius: 14px;
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.02) inset,
+        0 8px 30px rgba(0,0,0,0.45),
+        0 0 24px rgba(168,85,247,0.08);
+      padding: 14px;
+    }
+    .card-label {
+      font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--gp-text-mute); margin-bottom: 10px; font-weight: 700;
+    }
+
+    /* --- Mode selector (radio pill row) --- */
+    .mode-row {
+      display: flex; gap: 6px; padding: 4px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(168,85,247,0.15);
+      border-radius: 12px;
+    }
+    .mode-row label {
+      flex: 1; text-align: center; cursor: pointer;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+      color: var(--gp-text-dim);
+      padding: 8px 6px; border-radius: 9px;
+      transition: all 0.18s ease;
+      user-select: none;
+    }
+    .mode-row label:hover { color: var(--gp-text); }
+    .mode-row input { display: none; }
+    .mode-row input:checked + span.mode-pill {
+      color: #fff;
+      background: linear-gradient(135deg, rgba(168,85,247,0.35) 0%, rgba(236,72,153,0.25) 100%);
+      box-shadow: 0 0 0 1px var(--gp-border-strong), 0 6px 18px rgba(168,85,247,0.25);
+    }
+    .mode-pill { display: block; padding: 0; }
+
+    /* --- API key input --- */
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .input {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(168,85,247,0.18);
+      color: var(--gp-text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: 0.01em;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .input:focus {
+      border-color: var(--gp-border-strong);
+      box-shadow: 0 0 0 3px rgba(168,85,247,0.12);
+    }
+    .input::placeholder { color: var(--gp-text-mute); }
+
+    /* --- Action button --- */
+    .btn {
+      cursor: pointer;
+      border: none; outline: none;
+      color: #fff; font-weight: 800; letter-spacing: 0.01em;
+      padding: 11px 14px; border-radius: 11px;
+      background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+      box-shadow: 0 8px 24px rgba(168,85,247,0.35), inset 0 0 0 1px rgba(255,255,255,0.06);
+      transition: transform 0.08s ease, filter 0.15s ease, box-shadow 0.15s ease;
+      font-size: 13px;
+    }
+    .btn:hover { filter: brightness(1.06); box-shadow: 0 10px 28px rgba(168,85,247,0.45); }
+    .btn:active { transform: translateY(1px); }
+    .btn[disabled] { opacity: 0.6; cursor: not-allowed; filter: grayscale(0.2); }
+
+    .btn-ghost {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--gp-border);
+      color: var(--gp-text);
+      box-shadow: none;
+    }
+    .btn-ghost:hover { background: rgba(168,85,247,0.08); box-shadow: 0 0 0 1px var(--gp-border-strong); }
+
+    /* --- Summary card --- */
+    .summary-wrap { position: relative; }
+    .summary {
+      font-size: 13px; line-height: 1.55;
+      color: var(--gp-text);
+      max-height: 280px; overflow-y: auto;
+      padding-right: 6px;
+    }
+    .summary::-webkit-scrollbar { width: 6px; }
+    .summary::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.35); border-radius: 4px; }
+    .summary::-webkit-scrollbar-track { background: transparent; }
+
+    /* Markdown styling */
+    .summary h3 {
+      font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+      font-weight: 900;
+      background: linear-gradient(90deg, #a855f7, #ec4899);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      margin: 14px 0 6px;
+    }
+    .summary h3:first-child { margin-top: 0; }
+    .summary p { margin: 6px 0; font-weight: 600; }
+    .summary strong, .summary b { color: #fff; font-weight: 800; }
+    .summary em { color: #f0abfc; font-style: normal; font-weight: 700; }
+    .summary ul { margin: 6px 0 6px 18px; padding: 0; }
+    .summary li { margin: 3px 0; font-weight: 600; }
+    .summary code {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: rgba(168,85,247,0.10);
+      border: 1px solid rgba(168,85,247,0.18);
+      padding: 1px 5px; border-radius: 4px;
+      font-size: 12px; color: #f0abfc;
+    }
+    .summary pre {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(168,85,247,0.20);
+      border-radius: 8px;
+      padding: 10px; overflow-x: auto;
+      font-size: 12px; line-height: 1.5;
+    }
+    .summary hr {
+      border: none; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(168,85,247,0.35), transparent);
+      margin: 12px 0;
+    }
+
+    /* --- Action footer row --- */
+    .summary-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; margin-top: 12px;
+    }
+    .stats {
+      font-size: 10.5px; color: rgba(168,85,247,0.75);
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: 0.04em;
+    }
+
+    /* --- Loader --- */
+    .loader {
+      display: none; align-items: center; gap: 10px;
+      padding: 8px 0 0;
+    }
+    .loader.on { display: flex; }
+    .loader-ring {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid rgba(168,85,247,0.25);
+      border-top-color: #ec4899;
+      animation: gp-spin 0.8s linear infinite;
+      box-shadow: 0 0 14px rgba(168,85,247,0.45);
+    }
+    .loader-text {
+      font-size: 12px; color: var(--gp-text-dim); font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    @keyframes gp-spin { to { transform: rotate(360deg); } }
+
+    /* --- Empty / hint state --- */
+    .empty {
+      color: var(--gp-text-mute);
+      font-size: 12.5px; line-height: 1.6;
+      font-weight: 600;
+    }
+    .empty .kbd {
+      display: inline-block; padding: 1px 6px; border-radius: 5px;
+      background: rgba(168,85,247,0.10);
+      border: 1px solid rgba(168,85,247,0.25);
+      color: #f0abfc; font-family: "JetBrains Mono", monospace; font-size: 11px;
+    }
+
+    .row { display: flex; gap: 8px; }
+    .row > * { flex: 1; }
+    .footer-tip {
+      font-size: 10.5px; color: var(--gp-text-mute);
+      text-align: center; letter-spacing: 0.04em;
+    }
+
+    /* --- Repo link (TODO 6) --- */
+    .repo-link {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 6px;
+      font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #f0abfc;
+      text-decoration: none;
+      padding: 7px 12px;
+      border-radius: 9999px;
+      background: rgba(168, 85, 247, 0.08);
+      border: 1px solid rgba(168, 85, 247, 0.30);
+      box-shadow: 0 0 12px rgba(168,85,247,0.18) inset;
+      transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease;
+      cursor: pointer;
+    }
+    .repo-link:hover {
+      background: rgba(168, 85, 247, 0.16);
+      box-shadow: 0 0 18px rgba(168,85,247,0.35);
+      color: #fff;
+    }
+    .repo-link:active { transform: translateY(1px); }
+    .repo-link svg { width: 12px; height: 12px; fill: currentColor; }
+
+    .footer-row {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+
+    <div class="gp-header">
+      <div class="gp-brand">
+        <div class="gp-logo">G</div>
+        <div>
+          <div class="gp-title">GitPulse</div>
+          <div class="gp-sub">AI Code Reviewer</div>
+        </div>
+      </div>
+      <div class="gp-sub">v3.0</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Review Mode</div>
+      <div class="mode-row" id="modeRow">
+        <label><input type="radio" name="mode" value="short" /><span class="mode-pill">Quick</span></label>
+        <label><input type="radio" name="mode" value="detailed" checked /><span class="mode-pill">Detailed</span></label>
+        <label><input type="radio" name="mode" value="security" /><span class="mode-pill">Security</span></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Groq API Key</div>
+      <div class="field">
+        <input id="apiKey" class="input" type="password" placeholder="gsk_..." autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="saveKeyBtn" class="btn btn-ghost">Save Key</button>
+      <button id="analyzeBtn" class="btn">&#x26A1; Analyze</button>
+    </div>
+
+    <div class="card summary-wrap">
+      <div class="card-label">Summary</div>
+      <div id="summary" class="summary">
+        <div class="empty">
+          Open a GitHub <span class="kbd">.js</span> file or a PR diff, then click
+          the floating <span class="kbd">&#x2726; GitPulse</span> pill, or hit
+          <span class="kbd">&#x26A1; Analyze</span> above.
+        </div>
+      </div>
+
+      <div id="loader" class="loader">
+        <div class="loader-ring"></div>
+        <div class="loader-text">Thinking with llama-3.3-70b...</div>
+      </div>
+
+      <div class="summary-footer">
+        <div id="stats" class="stats">Estimated Cost: ~0 Tokens Processed</div>
+        <button id="exportBtn" class="btn btn-ghost" style="flex: 0 0 auto; padding: 8px 12px; font-size: 12px;">&#x1F4E5; Export to Markdown</button>
+      </div>
+    </div>
+
+    <div class="footer-tip">Powered by Groq &middot; llama-3.3-70b-versatile</div>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="diamondFill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f0abfc"/>
+      <stop offset="1" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="diamondStroke" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f0abfc"/>
+      <stop offset="0.5" stop-color="#ec4899"/>
+      <stop offset="1" stop-color="#a855f7"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Pulse waveform (left + right) -->
+  <g filter="url(#glow)" stroke="url(#diamondStroke)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="20,128 50,128 62,108 76,148 90,88 104,168 118,60 128,196"/>
+  </g>
+
+  <!-- Outer diamond -->
+  <g filter="url(#glow)">
+    <polygon points="128,52 196,128 128,204 60,128"
+             fill="rgba(168,85,247,0.10)"
+             stroke="url(#diamondStroke)"
+             stroke-width="6"
+             stroke-linejoin="round"/>
+  </g>
+
+  <!-- Inner crystal -->
+  <polygon points="128,84 162,128 128,172 94,128"
+           fill="url(#diamondFill)"
+           stroke="#f0abfc"
+           stroke-width="2"
+           stroke-linejoin="round"/>
+
+  <!-- Bright facet highlight -->
+  <polygon points="128,84 128,128 94,128" fill="rgba(255,255,255,0.55)"/>
+  <polygon points="128,84 162,128 128,128" fill="rgba(255,255,255,0.18)"/>
+
+  <!-- Right pulse (continued) -->
+  <g filter="url(#glow)" stroke="url(#diamondStroke)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="128,196 138,60 152,168 166,88 180,148 194,108 206,128 236,128"/>
+  </g>
+</svg>
