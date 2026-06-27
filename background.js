@@ -16,21 +16,48 @@ const PROMPTS = {
     "Provide a 2-sentence ultra-concise TL;DR summary of the following code/diff. " +
     "Be direct. No headers, no bullets, no preamble.",
   detailed:
-    "You are a Principal Engineer reviewing a code diff. Provide a detailed line-by-line " +
-    "engineering summary. Use EXACTLY these sections (each as a level-3 markdown header): " +
-    "'### \uD83C\uDFAF TL;DR', '### \uD83D\uDEE0\uFE0F Key Changes', '### \u26A0\uFE0F Risks'. " +
-    "Be specific, reference functions and files where possible. No prose outside the headers.",
+    "You are a Principal Engineer reviewing code/diff across ANY language. Adapt your " +
+    "analysis to the file type provided. Use EXACTLY these sections (each as a level-3 " +
+    "markdown header): '### \uD83C\uDFAF TL;DR', '### \uD83D\uDEE0\uFE0F Key Changes', '### \u26A0\uFE0F Risks'. " +
+    "For Python/Data Science: focus on computational efficiency, library usage, data " +
+    "structures. For Web (HTML/CSS/JS): focus on DOM optimization, styling patterns, " +
+    "accessibility. For compiled languages: focus on memory, type safety, performance. " +
+    "Be specific, reference functions and files. No prose outside headers.",
   security:
-    "Act as a Senior Cyber Security Auditor. Inspect this diff strictly for potential bugs, " +
-    "security vulnerabilities, leaked keys/secrets, injection risks, unsafe deserialization, " +
-    "auth/authz flaws, and performance issues. Use EXACTLY this section header: " +
-    "'### \u26A0\uFE0F Security Risks'. Use bullets. No other text."
+    "Act as a Senior Cyber Security Auditor. Inspect this code/diff strictly for bugs, " +
+    "vulnerabilities, leaked secrets, injection risks, unsafe deserialization, auth " +
+    "flaws, performance issues. Adapt to the language context (e.g., SQL injection for " +
+    "queries, XSS for web, memory safety for compiled languages). Use EXACTLY this " +
+    "section header: '### \u26A0\uFE0F Security Risks'. Use bullets. No other text."
 };
 
 function buildMessages(mode, code, meta) {
-  const system =
-    (PROMPTS[mode] || PROMPTS.detailed) +
-    " Always respond in well-formatted Markdown. Do NOT wrap the entire response in a code block.";
+  let systemPrompt = (PROMPTS[mode] || PROMPTS.detailed);
+
+  if (meta && meta.language) {
+    const lang = meta.language.toLowerCase();
+    let langHint = "";
+    
+    if (lang === ".py" || lang === ".ipynb") {
+      langHint = " File type: Python/Data Science. ";
+    } else if (['.js', '.ts', '.tsx', '.jsx'].includes(lang)) {
+      langHint = " File type: JavaScript/TypeScript. ";
+    } else if (['.html', '.css', '.scss', '.less'].includes(lang)) {
+      langHint = " File type: Web (HTML/CSS). ";
+    } else if (['.java', '.go', '.rs', '.cpp', '.c', '.cc'].includes(lang)) {
+      langHint = " File type: Compiled/System Language. ";
+    } else if (lang === ".sql") {
+      langHint = " File type: SQL. Focus on query optimization and injection risks. ";
+    } else if (['.rb', '.php'].includes(lang)) {
+      langHint = " File type: Scripted Language. ";
+    }
+    
+    if (langHint) {
+      systemPrompt += langHint;
+    }
+  }
+
+  systemPrompt += " Always respond in well-formatted Markdown. Do NOT wrap the entire response in a code block.";
 
   const user =
     `Repository / File: ${meta && meta.title ? meta.title : "unknown"}\n` +
@@ -38,7 +65,7 @@ function buildMessages(mode, code, meta) {
     "```\n" + code + "\n```";
 
   return [
-    { role: "system", content: system },
+    { role: "system", content: systemPrompt },
     { role: "user", content: user }
   ];
 }
@@ -90,7 +117,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         max_tokens: mode === "short" ? 220 : mode === "security" ? 900 : 1100,
         messages: buildMessages(mode, message.code, {
           title: message.title,
-          url: message.url
+          url: message.url,
+          language: message.language
         })
       };
 

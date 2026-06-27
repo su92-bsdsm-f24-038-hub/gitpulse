@@ -139,6 +139,37 @@
     applyStyles(pill, state ? PILL_BUSY_STYLES : { opacity: "", cursor: "" });
   }
 
+  // ---------- Language detector ----------
+  function detectLanguage() {
+    // Try: .final-path or [data-testid="file-title-header-text"]
+    const pathEl = document.querySelector(".final-path") ||
+                   document.querySelector("[data-testid='file-title-header-text']") ||
+                   document.querySelector(".Box-row [data-testid='file-title-header-text']");
+    
+    if (pathEl) {
+      const text = pathEl.textContent || "";
+      const match = text.match(/(\.[a-z0-9]+)$/i);
+      if (match) return match[1].toLowerCase();
+    }
+
+    // Fallback: check breadcrumb or title text
+    const breadcrumb = document.querySelector("[data-testid='breadcrumbs']");
+    if (breadcrumb) {
+      const text = breadcrumb.textContent || "";
+      const match = text.match(/(\.[a-z0-9]+)\s*$/);
+      if (match) return match[1].toLowerCase();
+    }
+
+    // Fallback: parse from page URL
+    try {
+      const url = new URL(location.href);
+      const match = url.pathname.match(/(\.[a-z0-9]+)(?:\?|$)/i);
+      if (match) return match[1].toLowerCase();
+    } catch (_) {}
+
+    return null; // unknown language
+  }
+
   // ---------- Scraper ----------
   function deepScrape() {
     const seen = new Set();
@@ -197,11 +228,13 @@
     setLabel(BOLT + " Thinking...");
 
     try {
+      const lang = detectLanguage();
       const response = await chrome.runtime.sendMessage({
         type: "GITPULSE_ANALYZE",
         code,
         url: location.href,
-        title: document.title
+        title: document.title,
+        language: lang
       });
 
       setLabel(response && response.ok ? (CHECK + " Done") : (CROSS + " Error"));
