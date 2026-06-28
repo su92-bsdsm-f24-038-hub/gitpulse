@@ -1,11 +1,7 @@
 /**
- * GitPulse — background.js (service worker)
- * Smart AI Feature Engine. Calls Groq (llama-3.3-70b-versatile) with a
- * dynamic system prompt based on user-selected mode. Returns:
- *   - summary (markdown)
- *   - tokens  (estimated input tokens: chars / 4)
- *   - mode
- * Persists the latest result as `last_summary` in chrome.storage.local.
+ * GitPulse — background.js (Polyglot Prompt Specialist)
+ * Master language-agnostic AI auditor. Dynamically inspects code syntax
+ * to detect language and generate optimized reviews for ANY framework.
  */
 
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
@@ -16,48 +12,27 @@ const PROMPTS = {
     "Provide a 2-sentence ultra-concise TL;DR summary of the following code/diff. " +
     "Be direct. No headers, no bullets, no preamble.",
   detailed:
-    "You are a Principal Engineer reviewing code/diff across ANY language. Adapt your " +
-    "analysis to the file type provided. Use EXACTLY these sections (each as a level-3 " +
-    "markdown header): '### \uD83C\uDFAF TL;DR', '### \uD83D\uDEE0\uFE0F Key Changes', '### \u26A0\uFE0F Risks'. " +
-    "For Python/Data Science: focus on computational efficiency, library usage, data " +
-    "structures. For Web (HTML/CSS/JS): focus on DOM optimization, styling patterns, " +
-    "accessibility. For compiled languages: focus on memory, type safety, performance. " +
-    "Be specific, reference functions and files. No prose outside headers.",
+    "You are a master polyglot software engineering auditor. You will receive source code " +
+    "snippets. Do not assume or default to Swift. Inspect the code syntax dynamically to " +
+    "determine if it is Python, JS/TS, C++, Java, HTML/CSS, Go, Rust, or any other language, " +
+    "and instantly generate the neon markdown code review optimized for THAT specific language " +
+    "framework and its idioms. Use EXACTLY these sections (each as a level-3 markdown header): " +
+    "'### \uD83C\uDFAF TL;DR', '### \uD83D\uDEE0\uFE0F Key Changes', '### \u26A0\uFE0F Risks'. " +
+    "Be specific, reference functions/methods and files. No prose outside headers.",
   security:
-    "Act as a Senior Cyber Security Auditor. Inspect this code/diff strictly for bugs, " +
-    "vulnerabilities, leaked secrets, injection risks, unsafe deserialization, auth " +
-    "flaws, performance issues. Adapt to the language context (e.g., SQL injection for " +
-    "queries, XSS for web, memory safety for compiled languages). Use EXACTLY this " +
-    "section header: '### \u26A0\uFE0F Security Risks'. Use bullets. No other text."
+    "Act as a Senior Cyber Security Auditor. Do NOT assume Swift. Dynamically inspect code " +
+    "syntax to identify the language being reviewed. Inspect this code/diff strictly for bugs, " +
+    "vulnerabilities, leaked secrets, injection risks, unsafe deserialization, auth flaws, " +
+    "performance issues, and memory safety concerns appropriate for the detected language. " +
+    "Adapt your security analysis to the specific attack vectors and vulnerabilities of that " +
+    "language (e.g., SQL injection for queries, XSS for web code, buffer overflows for C++, " +
+    "null pointer dereferences for compiled languages). Use EXACTLY this section header: " +
+    "'### \u26A0\uFE0F Security Risks'. Use bullets. No other text."
 };
 
 function buildMessages(mode, code, meta) {
-  let systemPrompt = (PROMPTS[mode] || PROMPTS.detailed);
-
-  if (meta && meta.language) {
-    const lang = meta.language.toLowerCase();
-    let langHint = "";
-    
-    if (lang === ".py" || lang === ".ipynb") {
-      langHint = " File type: Python/Data Science. ";
-    } else if (['.js', '.ts', '.tsx', '.jsx'].includes(lang)) {
-      langHint = " File type: JavaScript/TypeScript. ";
-    } else if (['.html', '.css', '.scss', '.less'].includes(lang)) {
-      langHint = " File type: Web (HTML/CSS). ";
-    } else if (['.java', '.go', '.rs', '.cpp', '.c', '.cc'].includes(lang)) {
-      langHint = " File type: Compiled/System Language. ";
-    } else if (lang === ".sql") {
-      langHint = " File type: SQL. Focus on query optimization and injection risks. ";
-    } else if (['.rb', '.php'].includes(lang)) {
-      langHint = " File type: Scripted Language. ";
-    }
-    
-    if (langHint) {
-      systemPrompt += langHint;
-    }
-  }
-
-  systemPrompt += " Always respond in well-formatted Markdown. Do NOT wrap the entire response in a code block.";
+  const systemPrompt = (PROMPTS[mode] || PROMPTS.detailed) +
+    " Always respond in well-formatted Markdown. Do NOT wrap the entire response in a code block.";
 
   const user =
     `Repository / File: ${meta && meta.title ? meta.title : "unknown"}\n` +
@@ -71,7 +46,6 @@ function buildMessages(mode, code, meta) {
 }
 
 function estimateTokens(text) {
-  // ~4 chars per token heuristic (Groq/OpenAI family).
   const chars = (text || "").length;
   return Math.max(1, Math.ceil(chars / 4));
 }
@@ -117,12 +91,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         max_tokens: mode === "short" ? 220 : mode === "security" ? 900 : 1100,
         messages: buildMessages(mode, message.code, {
           title: message.title,
-          url: message.url,
-          language: message.language
+          url: message.url
         })
       };
 
-      // Notify the popup that generation has started (loader on)
       chrome.runtime.sendMessage({ type: "GITPULSE_STATUS", status: "thinking", mode }).catch(() => {});
 
       const res = await fetch(GROQ_ENDPOINT, {
@@ -181,5 +153,5 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
   })();
 
-  return true; // async response
+  return true;
 });

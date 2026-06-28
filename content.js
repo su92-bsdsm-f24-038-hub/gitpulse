@@ -1,7 +1,7 @@
 /**
- * GitPulse — content.js
- * Bulletproof floating pill with dynamic injection, MutationObserver,
- * Turbo navigation hooks, and inline style override.
+ * GitPulse — content.js (Blind Code Gatherer)
+ * Sweeps entire visible DOM code areas without language assumptions.
+ * Extracts raw code text, joins cleanly, and sends to background.js.
  */
 
 (() => {
@@ -47,19 +47,27 @@
     boxShadow: "0 0 28px rgba(168,85,247,0.7), 0 10px 28px rgba(0,0,0,0.4)"
   };
 
-  // ---------- Selectors & limits ----------
-  const SELECTORS = [
-    ".js-file-content",
-    ".diff-table",
+  // ---------- DOM Container Selectors (GitHub code viewers) ----------
+  const CODE_CONTAINERS = [
     ".blob-code",
     ".blob-code-inner",
-    ".blob-code-deletion",
-    ".blob-code-addition",
+    ".js-file-content",
+    "table.highlight",
     "[data-testid='diff-code']",
-    ".highlight",
-    "table.diff-table",
+    ".diff-table",
+    ".Box-row",
+    "[data-testid='file-content-header']",
     "pre",
     "code"
+  ];
+
+  const FALLBACK_CONTAINERS = [
+    "[data-testid='file-content-container']",
+    ".file-content",
+    ".blob-wrapper",
+    ".container-lg",
+    "main",
+    "article"
   ];
 
   const MAX_CHARS = 24000;
@@ -86,7 +94,6 @@
     let pill = document.getElementById(PILL_ID);
     if (pill && pill.isConnected) return pill;
 
-    // Re-create if missing or detached
     if (pill && !pill.isConnected) pill.remove();
 
     pill = document.createElement("button");
@@ -96,7 +103,6 @@
     pill.setAttribute("data-gitpulse", "true");
     pill.innerHTML = '<span class="gp-sparkle"></span><span class="gp-label">GitPulse</span>';
 
-    // Inline styles
     applyStyles(pill, PILL_STYLES);
 
     const sparkle = pill.querySelector(".gp-sparkle");
@@ -109,17 +115,14 @@
       label.style.cssText = "line-height:1;display:inline-block;";
     }
 
-    // Hover
     pill.addEventListener("mouseenter", () => applyStyles(pill, PILL_HOVER_STYLES));
     pill.addEventListener("mouseleave", () => {
       pill.style.removeProperty("filter");
       pill.style.removeProperty("box-shadow");
     });
 
-    // Click → analyze
     pill.addEventListener("click", onPillClick);
 
-    // Mount
     (document.body || document.documentElement).appendChild(pill);
     return pill;
   }
@@ -139,87 +142,127 @@
     applyStyles(pill, state ? PILL_BUSY_STYLES : { opacity: "", cursor: "" });
   }
 
-  // ---------- Language detector ----------
-  function detectLanguage() {
-    // Try: .final-path or [data-testid="file-title-header-text"]
-    const pathEl = document.querySelector(".final-path") ||
-                   document.querySelector("[data-testid='file-title-header-text']") ||
-                   document.querySelector(".Box-row [data-testid='file-title-header-text']");
-    
-    if (pathEl) {
-      const text = pathEl.textContent || "";
-      const match = text.match(/(\.[a-z0-9]+)$/i);
-      if (match) return match[1].toLowerCase();
-    }
-
-    // Fallback: check breadcrumb or title text
-    const breadcrumb = document.querySelector("[data-testid='breadcrumbs']");
-    if (breadcrumb) {
-      const text = breadcrumb.textContent || "";
-      const match = text.match(/(\.[a-z0-9]+)\s*$/);
-      if (match) return match[1].toLowerCase();
-    }
-
-    // Fallback: parse from page URL
-    try {
-      const url = new URL(location.href);
-      const match = url.pathname.match(/(\.[a-z0-9]+)(?:\?|$)/i);
-      if (match) return match[1].toLowerCase();
-    } catch (_) {}
-
-    return null; // unknown language
-  }
-
-  // ---------- Scraper ----------
-  function deepScrape() {
+  // ---------- Blind Code Scraper (NO language assumptions) ----------
+  function blindCodeSweep() {
+    const lines = [];
     const seen = new Set();
-    const chunks = [];
-    let total = 0;
+    let totalChars = 0;
 
-    for (const sel of SELECTORS) {
+    // First pass: sweep primary code containers
+    for (const selector of CODE_CONTAINERS) {
       let nodes = [];
-      try { nodes = Array.from(document.querySelectorAll(sel)); }
-      catch (_) { continue; }
+      try {
+        nodes = Array.from(document.querySelectorAll(selector));
+      } catch (_) {
+        continue;
+      }
 
       for (const node of nodes) {
-        // Don't scrape the pill itself
+        // Skip the pill itself
         if (node.id === PILL_ID || node.closest("#" + PILL_ID)) continue;
 
-        const text = (node.innerText || node.textContent || "").trim();
+        // Extract text content
+        let text = node.innerText || node.textContent || "";
+        text = text.trim();
+
         if (!text) continue;
 
-        const key = text.slice(0, 120);
+        // Deduplicate by first 200 chars
+        const key = text.slice(0, 200);
         if (seen.has(key)) continue;
         seen.add(key);
 
-        if (total + text.length > MAX_CHARS) {
-          const room = Math.max(0, MAX_CHARS - total);
-          if (room > 0) {
-            chunks.push(text.slice(0, room));
-            total += room;
+        // Split on newlines and filter empty lines
+        const nodeLines = text.split(/\r?\n/).filter(line => line.length > 0);
+
+        for (const line of nodeLines) {
+          if (totalChars + line.length + 1 > MAX_CHARS) {
+            const room = Math.max(0, MAX_CHARS - totalChars);
+            if (room > 0) {
+              lines.push(line.slice(0, room));
+              totalChars += room;
+            }
+            return lines.join("\n");
           }
-          break;
+          lines.push(line);
+          totalChars += line.length + 1;
         }
-        chunks.push(text);
-        total += text.length;
+
+        if (totalChars >= MAX_CHARS) {
+          return lines.join("\n");
+        }
       }
-      if (total >= MAX_CHARS) break;
     }
 
-    let body = chunks.join("\n\n").trim();
-    if (body.length > MAX_CHARS) {
-      body = body.slice(0, MAX_CHARS) + "\n\n[...truncated for context window...]";
+    // If still empty, try fallback containers (broader sweep)
+    if (lines.length === 0) {
+      for (const selector of FALLBACK_CONTAINERS) {
+        let nodes = [];
+        try {
+          nodes = Array.from(document.querySelectorAll(selector));
+        } catch (_) {
+          continue;
+        }
+
+        for (const node of nodes) {
+          if (node.id === PILL_ID || node.closest("#" + PILL_ID)) continue;
+
+          let text = node.innerText || node.textContent || "";
+          text = text.trim();
+
+          if (!text || text.length < 20) continue;
+
+          // Only grab code-like lines (no UI nav/menu spam)
+          const codeLines = text.split(/\r?\n/)
+            .filter(line => {
+              const trimmed = line.trim();
+              // Skip GitHub UI lines
+              if (trimmed.match(/^(Conversation|Code|Pull|Issues|GitHub)/i)) return false;
+              if (trimmed.match(/^(Fork|Star|Watch|Sponsor)/i)) return false;
+              if (trimmed.length === 0) return false;
+              return true;
+            });
+
+          if (codeLines.length === 0) continue;
+
+          const key = codeLines.slice(0, 3).join("|");
+          if (seen.has(key)) continue;
+          seen.add(key);
+
+          for (const line of codeLines) {
+            if (totalChars + line.length + 1 > MAX_CHARS) {
+              const room = Math.max(0, MAX_CHARS - totalChars);
+              if (room > 0) {
+                lines.push(line.slice(0, room));
+                totalChars += room;
+              }
+              return lines.join("\n");
+            }
+            lines.push(line);
+            totalChars += line.length + 1;
+          }
+
+          if (totalChars >= MAX_CHARS) {
+            return lines.join("\n");
+          }
+        }
+      }
     }
-    return body;
+
+    let result = lines.join("\n").trim();
+    if (result.length > MAX_CHARS) {
+      result = result.slice(0, MAX_CHARS) + "\n\n[...truncated for context window...]";
+    }
+    return result;
   }
 
   // ---------- Click handler ----------
   async function onPillClick() {
     if (processing) return;
 
-    const code = deepScrape();
-    if (!code) {
-      setLabel(CROSS + " No Code Found");
+    const code = blindCodeSweep();
+    if (!code || code.length < 5) {
+      setLabel(CROSS + " No Code");
       setTimeout(() => setLabel("GitPulse"), 2000);
       return;
     }
@@ -228,13 +271,11 @@
     setLabel(BOLT + " Thinking...");
 
     try {
-      const lang = detectLanguage();
       const response = await chrome.runtime.sendMessage({
         type: "GITPULSE_ANALYZE",
         code,
         url: location.href,
-        title: document.title,
-        language: lang
+        title: document.title
       });
 
       setLabel(response && response.ok ? (CHECK + " Done") : (CROSS + " Error"));
@@ -252,7 +293,6 @@
   // ---------- Bridge from popup ----------
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg && msg.type === "GITPULSE_TRIGGER_FROM_POPUP") {
-      // The pill may not exist yet on a fresh navigation; ensure it.
       ensurePill();
       onPillClick();
     }
@@ -261,7 +301,7 @@
   // ---------- Lifecycle wiring ----------
   function watchMutations() {
     if (observer) return;
-    if (!document.body) return; // try again on DOMContentLoaded
+    if (!document.body) return;
 
     observer = new MutationObserver(() => {
       const pill = document.getElementById(PILL_ID);
@@ -279,7 +319,6 @@
     turboWired = true;
 
     const rehook = () => {
-      // Remove a stale pill so we can re-anchor cleanly after Turbo replace.
       const stale = document.getElementById(PILL_ID);
       if (stale && stale.isConnected) stale.remove();
       ensurePill();
@@ -314,7 +353,6 @@
     wireTurbo();
     hookHistory();
 
-    // GitHub can render the file area lazily; re-check for a few seconds.
     let ticks = 0;
     const tick = setInterval(() => {
       ensurePill();
